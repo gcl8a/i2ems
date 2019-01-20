@@ -8,11 +8,14 @@ File dataFile;        //dataFile manager
 const int THERMISTOR_PIN = A0;
 
 const uint32_t reportInterval = 1000; //once per second
-
+uint32_t lastReport = 0;
+  
 void setup() 
 {
   Serial.begin(115200);
   
+  Serial.println("\nsetup()");
+
   Serial.print("Initializing SD card...");
 
   // see if the card is present and can be initialized:
@@ -27,6 +30,10 @@ void setup()
 
   Serial.print("Writing to file: ");
   Serial.println(filename);
+
+  lastReport = millis();
+
+  Serial.println("/setup()");
 }
 
 void loop() 
@@ -40,13 +47,10 @@ void loop()
     }
   }
   
-  static uint32_t lastReport = 0;
   uint32_t currTime = millis();
   
   if(currTime - lastReport > reportInterval) //time for a new reading
   {
-    lastReport += reportInterval;
-
     uint32_t adc = analogRead(THERMISTOR_PIN);
 
     //The student needs to put the proper equations in the next three lines!!!!
@@ -77,6 +81,8 @@ void loop()
       Serial.println("Error opening file!");
       while(1) {} //die in a sad, infinite loop
     }
+    
+    lastReport += reportInterval;
   }
 }
 
@@ -89,8 +95,9 @@ uint32_t CalcDecayTime(uint8_t pin)
   uint32_t startTime = micros(); //start the timer
   pinMode(pin, INPUT); //make the pin an INPUT so the capacitor discharges slowly
   while(digitalRead(pin) == HIGH) {} //wait while the pin is HIGH
-
   uint32_t endTime = micros(); //after the loop breaks, take the end time
+
+  return endTime - startTime;
 }
 
 String CreateNewFile(void) //creates a new file of the form therm_##.csv; auto-increments so old files aren't clobbered
@@ -103,7 +110,7 @@ String CreateNewFile(void) //creates a new file of the form therm_##.csv; auto-i
   char filename[13]; //use 8.3 format 
   while(!fileSuccess)
   {
-    sprintf(filename, "therm_%02i.csv", fileCount);
+    sprintf(filename, "therm%03i.csv", fileCount);
     if(SD.exists(filename))
     {
       fileCount++;
