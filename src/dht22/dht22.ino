@@ -1,6 +1,6 @@
 #include <DHT.h>
 
-#define SENSOR_INTERVAL 2000UL
+#define SENSOR_INTERVAL 500UL
 
 #define DHT_PIN_1 8
 DHT dht(DHT_PIN_1, DHT22);
@@ -18,8 +18,9 @@ void loop()
   
   if(millis() - lastRead > SENSOR_INTERVAL)
   {
-    float humidity = dht.readHumidity();
-    float temperature = dht.readTemperature();
+    dht.read();
+    float temperature = dht.CalcTemperature();
+    float humidity = dht.CalcHumidity();
 
     Serial.print(millis());
     Serial.print('\t');

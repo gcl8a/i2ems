@@ -8,7 +8,8 @@ written by Adafruit Industries
 
 #define MIN_INTERVAL 2000
 
-DHT::DHT(uint8_t pin, uint8_t type, uint8_t count) {
+DHT::DHT(uint8_t pin, uint8_t type)
+{
   _pin = pin;
   _type = type;
   #ifdef __AVR
@@ -17,8 +18,6 @@ DHT::DHT(uint8_t pin, uint8_t type, uint8_t count) {
   #endif
   _maxcycles = microsecondsToClockCycles(1000);  // 1 millisecond timeout for
                                                  // reading pulses from DHT sensor.
-  // Note that count is now ignored as the DHT reading algorithm adjusts itself
-  // basd on the speed of the processor.
 }
 
 void DHT::begin(void) {
@@ -31,17 +30,14 @@ void DHT::begin(void) {
   DEBUG_PRINT("Max clock cycles: "); DEBUG_PRINTLN(_maxcycles, DEC);
 }
 
-//boolean S == Scale.  True == Fahrenheit; False == Celcius
-float DHT::readTemperature(bool S, bool force) {
+float DHT::CalcTemperature(void)
+{
   float f = NAN;
 
-  if (read(force)) {
-    switch (_type) {
+    switch (_type)
+    {
     case DHT11:
       f = data[2];
-      if(S) {
-        f = convertCtoF(f);
-      }
       break;
     case DHT22:
     case DHT21:
@@ -52,27 +48,16 @@ float DHT::readTemperature(bool S, bool force) {
       if (data[2] & 0x80) {
         f *= -1;
       }
-      if(S) {
-        f = convertCtoF(f);
-      }
       break;
     }
-  }
+  
   return f;
 }
 
-float DHT::convertCtoF(float c) {
-  return c * 1.8 + 32;
-}
-
-float DHT::convertFtoC(float f) {
-  return (f - 32) * 0.55555;
-}
-
-float DHT::readHumidity(bool force) {
+float DHT::CalcHumidity(void) {
   float f = NAN;
-  if (read()) {
-    switch (_type) {
+    switch (_type)
+    {
     case DHT11:
       f = data[0];
       break;
@@ -84,40 +69,8 @@ float DHT::readHumidity(bool force) {
       f *= 0.1;
       break;
     }
-  }
+  
   return f;
-}
-
-//boolean isFahrenheit: True == Fahrenheit; False == Celcius
-float DHT::computeHeatIndex(float temperature, float percentHumidity, bool isFahrenheit) {
-  // Using both Rothfusz and Steadman's equations
-  // http://www.wpc.ncep.noaa.gov/html/heatindex_equation.shtml
-  float hi;
-
-  if (!isFahrenheit)
-    temperature = convertCtoF(temperature);
-
-  hi = 0.5 * (temperature + 61.0 + ((temperature - 68.0) * 1.2) + (percentHumidity * 0.094));
-
-  if (hi > 79) {
-    hi = -42.379 +
-             2.04901523 * temperature +
-            10.14333127 * percentHumidity +
-            -0.22475541 * temperature*percentHumidity +
-            -0.00683783 * pow(temperature, 2) +
-            -0.05481717 * pow(percentHumidity, 2) +
-             0.00122874 * pow(temperature, 2) * percentHumidity +
-             0.00085282 * temperature*pow(percentHumidity, 2) +
-            -0.00000199 * pow(temperature, 2) * pow(percentHumidity, 2);
-
-    if((percentHumidity < 13) && (temperature >= 80.0) && (temperature <= 112.0))
-      hi -= ((13.0 - percentHumidity) * 0.25) * sqrt((17.0 - abs(temperature - 95.0)) * 0.05882);
-
-    else if((percentHumidity > 85.0) && (temperature >= 80.0) && (temperature <= 87.0))
-      hi += ((percentHumidity - 85.0) * 0.1) * ((87.0 - temperature) * 0.2);
-  }
-
-  return isFahrenheit ? hi : convertFtoC(hi);
 }
 
 boolean DHT::read(bool force) {
@@ -135,15 +88,10 @@ boolean DHT::read(bool force) {
   // Send start signal.  See DHT datasheet for full signal diagram:
   //   http://www.adafruit.com/datasheets/Digital%20humidity%20and%20temperature%20sensor%20AM2302.pdf
 
-  // Go into high impedence state to let pull-up raise data line level and
-  // start the reading process.
-  digitalWrite(_pin, HIGH);
-  delay(250);
-
   // First set data line low for 20 milliseconds.
   pinMode(_pin, OUTPUT);
   digitalWrite(_pin, LOW);
-  delay(20);
+  delay(2);
 
   uint32_t cycles[80];
   {
@@ -206,6 +154,9 @@ boolean DHT::read(bool force) {
     // cycle count so this must be a zero.  Nothing needs to be changed in the
     // stored data.
   }
+    
+    //set the pint back to pulled high
+    pinMode(_pin, INPUT_PULLUP);
 
   DEBUG_PRINTLN(F("Received:"));
   DEBUG_PRINT(data[0], HEX); DEBUG_PRINT(F(", "));
