@@ -1,13 +1,29 @@
+//SD card stuff
 #include <SD.h>
 
 const int CS_SD = 4;  //chip select for the SD card
 String filename;      //for managing filenames
 File dataFile;        //dataFile manager
 
+//DHT sensor
+#include <DHT.h>
+
+#define DHT_PIN_1 8
+DHT dht(DHT_PIN_1, DHT22);
+
+//BME280
+#include<BME280.h>
+
+#define BME280_I2C_ADDRESS 0x77 //THIS WON'T WORK! LEFT FOR THE STUDENT TO ENTER!!!
+BME280 bme280(BME280_I2C_ADDRESS);
+
 //define which pin the thermistor is on
 const int THERMISTOR_PIN = A0;
 
-const uint32_t reportInterval = 1000; //once per second
+//define which pin the T<P36 is on
+const int TMP36_PIN = A1;
+
+const uint32_t reportInterval = 250; //once per second
 uint32_t lastReport = 0;
   
 void setup() 
@@ -28,8 +44,18 @@ void setup()
 
   filename = CreateNewFile();
 
-  Serial.print(F("Writing to file: "));
+  Serial.print(F("Filename: "));
   Serial.println(filename);
+
+  //start the dht  
+  dht.begin();
+
+  //start the bme280
+  bme280.Init();
+
+  //bme280.writeRegister(<LEFT FOR THE STUDENT>);
+  uint8_t regF4 = bme280.readRegister(0xf4);
+  Serial.println(regF4, HEX);
 
   lastReport = millis();
 
@@ -42,7 +68,7 @@ void loop()
   {
     if(Serial.read() == 'S')
     {
-      Serial.println("It is now safe to remove the SD card");
+      Serial.println(F("It is now safe to remove the SD card"));
       while(1) {} //stop
     }
   }
@@ -51,18 +77,35 @@ void loop()
   
   if(currTime - lastReport > reportInterval) //time for a new reading
   {
-    uint32_t adc = analogRead(THERMISTOR_PIN);
+    //read the thermistor
+    uint16_t adc_thermistor = analogRead(THERMISTOR_PIN);
 
     //The student needs to put the proper equations in the next three lines!!!!
-    float voltage = 0;      //fine the voltage from the voltage divder equation
-    float resistance = 0;   //then find the resistance of the thermistor
-    float temperature = 0;  //then the temperature
+    float voltage = adc_thermistor * 5.0 / 1024.0;      //fine the voltage from the voltage divder equation
+    float resistance = 10000.0 * (5.0 - voltage) / voltage;   //then find the resistance of the thermistor
+    float T_inv = 1.0 / 296.0 + log(resistance / 10000.0) / 4300.0;
+    float T_thermistor = 1 / T_inv - 273.15;  //then the temperature
+
+    //read the TMP36
+    uint16_t adc_36 = analogRead(TMP36_PIN);
+    float T_tmp36 = (((adc_36*5.0) / 1024.0) - 0.5) / 0.01;
+
+    //dht
+    dht.read();
+    float T_dht = dht.CalcTemperature();
+    float RH_dht = dht.CalcHumidity();
+
+    //bme280
+    BME280Reading bme280_reading = bme280.TakeReading();
 
     String dataString = String(currTime) + '\t' 
-                        + String(adc) + '\t'
-                        + String(voltage) + '\t'
-                        + String(resistance) + '\t'
-                        + String(temperature) + '\n';
+//                        + String(adc) + '\t'
+//                        + String(voltage) + '\t'
+//                        + String(resistance) + '\t'
+                        + String(T_thermistor) + '\t'
+                        + String(T_tmp36) + '\t'
+                        + String(T_dht) + '\t'
+                        + String(bme280_reading.temperature) + '\n';
                         
     Serial.print(dataString);
 
